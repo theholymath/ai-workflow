@@ -37,11 +37,12 @@ flowchart TD
     C -->|Documentation| D
     C -->|Bug Fixes| D
     D -->|Create git branch for task| E[Use aider to improve code]
-    E -->|aider --message "Implement improvement"| F[Review and commit changes]
+    E -->|aider with improvement message| F[Review and commit changes]
     F --> G{More tasks?}
     G -->|Yes| C
     G -->|No| H[Done]
 ```
+
 ## Setup and Installation
 
 ### Install Tools (mise, aider, repomix, llm)
