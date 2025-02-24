@@ -1,10 +1,50 @@
 # Mise and LLM Codebase Improvement Workflow
 
-This document provides a detailed guide to using the `mise` task runner along with LLM tools to analyze, improve, and maintain your codebase. The workflow combines repository analysis, LLM-powered code review, test coverage improvement, and documentation generation into a systematic approach for codebase enhancement.
+This document provides a detailed guide to using the [`mise`](https://mise.jdx.dev) task runner along with [`repomix`](https://github.com/yamadashy/repomix) and [`LLM`](https://github.com/simonw/LLM) tools to analyze, improve, and maintain your codebase. The workflow combines repository analysis, LLM-powered code review, test coverage improvement, and documentation generation into a systematic approach for codebase enhancement.
 
+The end goal is to use this analysis as input to [`aider`](https://aider.chat) (or cursor, etc.) so you have  **fast, stable, and repeatable** automation for improving codebases. 
+
+## Workflow Goal
+The goal is to have a FAST (10 minutes?) have a meta understanding of your codebase, have actionable code enhancements, and an ability to do all this from the command line. 
+
+### Sample Flow
+1. Go to root of the directory where the code lives
+1. Run [`aider`]() (**always make sure you are on a new branch**)
+1. run `mise run LLM:generate_missing_tests`
+1. Look at the generated markdown file (`missing-tests.md`)
+1. Paste the first missing test “issue” into aider
+1. `aider` does `aider` things 🤖
+1. Interact and get it right
+1. ...
+1. Run tests
+1. Move to next test 
+
+# Why? Why are we doing all this?
+At first this may seem over-the-top but this is a workflow that allows a developer to be fast and repeatable. The packages all have logs so you know what prompts, changes, commits all happened. Everything can be **undone in an automated fashion**.
+
+Highlights:
+* `aider` uses a local git for all code changes. When a user accepts, a commit is created with diffs and documentation 
+* `llm` has [logs](https://llm.datasette.io/en/stable/logging.html) for all steps. Nothing is hidden.  
+
+```mermaid
+flowchart TD
+    A[Create repomap using repomix] -->|mise run LLM:clean_bundles| B[Analyze the repo or subset]
+    B -->|mise run LLM:generate_code_review| C[Choose a task]
+    B -->|mise run LLM:generate_missing_tests| C
+    B -->|mise run LLM:generate_readme| C
+    C -->|Unit Tests| D[Create focused steps for improvement]
+    C -->|UI Enhancements| D
+    C -->|Documentation| D
+    C -->|Bug Fixes| D
+    D -->|Create git branch for task| E[Use aider to improve code]
+    E -->|aider --message "Implement improvement"| F[Review and commit changes]
+    F --> G{More tasks?}
+    G -->|Yes| C
+    G -->|No| H[Done]
+```
 ## Setup and Installation
 
-### Prerequisites
+### Install Tools (mise, aider, repomix, llm)
 
 1. **Install mise**
    ```bash
@@ -19,6 +59,9 @@ This document provides a detailed guide to using the `mise` task runner along wi
    ```bash
    # Using pip
    pip install repomix
+
+   # using brew
+   brew install repomix
    
    # Using npm
    npm install -g repomix
@@ -28,6 +71,9 @@ This document provides a detailed guide to using the `mise` task runner along wi
    ```bash
    # Using pip
    pip install llm
+
+   # install provider plugins (if you want to use something besides OpenAI)
+   llm install llm-openrouter
    
    # Configure with your API keys
    llm keys set openai
@@ -40,35 +86,52 @@ This document provides a detailed guide to using the `mise` task runner along wi
    pip install aider-chat
    ```
 
-### Configuration Setup
+### Configure mise.toml
 
 Create a `.mise.toml` file in your project root with the following content:
 
 ```toml
 [env]
 # Set your preferred model here to use across all tasks
-model = "anthropic/claude-3-sonnet"
+reasoning_model = "your/reasoning/model" # "openrouter/google/gemini-2.0-flash-001"
+coding_model = "your/coding/model"
 
-[tasks.LLM.clean_bundles]
+[tasks."LLM:clean_bundles"]
 description = "Generate LLM bundle output file using repomix"
 run = "repomix -o repo_output.txt"
 
-[tasks.LLM.copy_buffer_bundle]
+[tasks."LLM:copy_buffer_bundle"] #notice the quotes
 description = "Copy generated LLM bundle to clipboard"
 run = "cat repo_output.txt | pbcopy"  # Use xclip for Linux
 
-[tasks.LLM.generate_code_review]
+[tasks."LLM:generate_code_review"]
 description = "Generate code review from repository content"
-run = "cat repo_output.txt | llm --system \"You are an expert software architect performing a thorough code review. Focus on architecture, patterns, potential bugs, and maintainability issues. Organize your review by file with clear headings.\" \"Perform a comprehensive code review of this repository. Highlight strengths, weaknesses, bugs, and opportunities for improvement. Include specific code references when possible.\" > code_review.md"
+run = "cat repo_output.txt | LLM -m ${reasoning_model} -t code-review-gen > code-review.md"
 
-[tasks.LLM.generate_missing_tests]
-description = "Generate suggestions for missing tests"
-run = "cat repo_output.txt | llm --system \"You are an expert in test-driven development and test coverage analysis. Focus on identifying untested code and suggesting specific test cases with clear implementation notes.\" \"Analyze this codebase and identify areas lacking test coverage. For each area, create a separate section with a specific title for the missing test, detailed description of what should be tested, and sample test code where appropriate. Format each missing test as a separate task that could be implemented independently.\" > missing_tests.md"
+[tasks."LLM:generate_missing_tests"]
+description = "Generate missing tests suggestions"
+run = "cat repo_output.txt | LLM -m ${coding_model} -t test-coverage-gen > missing-tests.md"
 
-[tasks.LLM.generate_readme]
-description = "Generate a README.md from repository content"
-run = "cat repo_output.txt | llm --system \"You are a technical documentation expert. Focus on clarity, completeness, and usability. Structure your documentation with clear sections, examples, and setup instructions.\" \"Generate a comprehensive README.md for this repository. Include project overview, setup instructions, usage examples, architecture explanation, and API documentation where relevant. Use proper markdown formatting with headings, lists, and code blocks.\" > README.md"
+[tasks."LLM:generate_readme"]
+description = "Generate README.md from repository content"
+run = "cat repo_output.txt | LLM -m ${reasoning_model} -t readme-gen > README.md"
 ```
+### The templates in `llm`
+This took me a bit to wrap my head around. The flag `-t readme-gen` is a "template" that `llm` calls. It is the prompt you want to use for the task at hand.
+
+```bash
+llm --system "Based on the codebase in this file, please generate a detailed README.md that includes an overview of the project, its main features, setup instructions, and usage examples." --save readme-gen
+```
+
+```bash
+llm --system "You are a senior developer. Your job is to do a thorough code review of this code. You should write it up and output markdown. Include line numbers, and contextual info. Your code review will be passed to another teammate, so be thorough. Think deeply  before writing the code review. Review every part, and don't hallucinate." --save code-review-gen
+```
+
+```bash
+llm --system "You are a senior developer. Your job is to review this code, and write out a list of missing test cases, and code tests that should exist. You should be specific, and be very good. Do Not Hallucinate. Think quietly to yourself, then act - write the issues. The issues  will be given to a developer to executed on, so they should be in a format that is compatible with github issues" --save test-coverage-gen
+```
+
+
 
 For global configuration, you can add these to `~/.config/mise/config.toml` instead.
 
@@ -253,11 +316,11 @@ Save this as `improve_docstrings.sh`, make it executable (`chmod +x improve_docs
 You can create additional custom tasks in your `.mise.toml`:
 
 ```toml
-[tasks.LLM.generate_swagger_docs]
+[tasks."LLM:generate_swagger_docs"]
 description = "Generate Swagger/OpenAPI documentation"
 run = "cat repo_output.txt | llm --system \"You are an API documentation specialist.\" \"Generate Swagger/OpenAPI documentation for all API endpoints in this codebase. Include parameters, responses, and examples.\" > swagger_docs.md"
 
-[tasks.LLM.security_audit]
+[tasks."LLM:security_audit"]
 description = "Perform a security audit on the codebase"
 run = "cat repo_output.txt | llm --system \"You are a cybersecurity expert with experience in identifying security vulnerabilities in code.\" \"Perform a comprehensive security audit of this codebase. Identify potential vulnerabilities, classify them by severity, and provide remediation steps for each issue.\" > security_audit.md"
 ```
@@ -267,7 +330,7 @@ run = "cat repo_output.txt | llm --system \"You are a cybersecurity expert with 
 You can override the default model for specific tasks:
 
 ```toml
-[tasks.LLM.security_audit]
+[tasks."LLM:security_audit"]
 description = "Perform a security audit on the codebase"
 run = "cat repo_output.txt | llm --model openai/gpt-4 --system \"You are a cybersecurity expert with experience in identifying security vulnerabilities in code.\" \"Perform a comprehensive security audit of this codebase.\" > security_audit.md"
 ```
