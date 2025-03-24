@@ -69,22 +69,49 @@ flowchart TD
    ```
 
 3. **Install LLM command-line tool**
+
+   [`azure-llm`](https://github.com/fabge/llm-azure)
+
    ```bash
    # Using pip
    pip install llm
 
    # install provider plugins (if you want to use something besides OpenAI)
    llm install llm-openrouter
+   llm install llm-azure 
    
    # Configure with your API keys
    llm keys set openai
    # Or for other providers
    llm keys set anthropic
+   # for azure once installed llm-azure plugin (see below for setup)
+   llm keys set azure
    ```
 
-4. **Install Aider (optional, for automated fixes)**
+4. **Install Aider** 
    ```bash
    pip install aider-chat
+   ```
+
+   Go [here](https://aider.chat/docs/llms/azure.html) for setting up Aider for Azure
+   ```bash
+   python -m pip install -U aider-chat
+
+   # Mac/Linux:                                           
+   export AZURE_API_KEY=<key>
+   export AZURE_API_VERSION=2023-05-15
+   export AZURE_API_BASE=https://myendpt.openai.azure.com
+
+   # Windows
+   setx AZURE_API_KEY <key>
+   setx AZURE_API_VERSION 2023-05-15
+   setx AZURE_API_BASE https://myendpt.openai.azure.com
+   # ... restart your shell after setx commands
+
+   aider --model azure/<your_deployment_name>
+
+   # List models available from Azure
+   aider --list-models azure/
    ```
 
 ### Configure mise.toml
@@ -117,6 +144,34 @@ run = "cat repo_output.txt | LLM -m ${coding_model} -t test-coverage-gen > missi
 description = "Generate README.md from repository content"
 run = "cat repo_output.txt | LLM -m ${reasoning_model} -t readme-gen > README.md"
 ```
+### Setting up llm-azure
+The documentation for [`azure-llm`](https://github.com/fabge/llm-azure) buries some details. Besides setting up keys there also needs to be a config file in your llm library.
+```bash
+# find where the directory for llm CLI is
+dirname "$(llm logs path)"
+
+# cd into that dir
+cd "$(dirname "$(llm logs path)")"
+
+# Create an azure config file for you particular deployments
+mkdir azure
+touch azure/config.yaml
+```
+
+Configure the yaml file to your deployments found in the portal or through `az cli` for example
+```bash
+- model_id: gpt-4-32k
+  model_name: gpt-4-32k
+  api_base: https://your_deployment.openai.azure.com/
+  api_version: '2023-05-15'
+
+- model_id: text-embedding-3-small
+  embedding_model: true
+  model_name: text-embedding-3-small
+  api_base: https://your_deployment.openai.azure.com/
+  api_version: '2023-05-14'
+  ```
+
 ### The templates in `llm`
 This took me a bit to wrap my head around. The flag `-t readme-gen` is a "template" that `llm` calls. It is the prompt you want to use for the task at hand.
 
