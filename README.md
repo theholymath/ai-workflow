@@ -176,15 +176,43 @@ Configure the yaml file to your deployments found in the portal or through `az c
 This took me a bit to wrap my head around. The flag `-t readme-gen` is a "template" that `llm` calls. It is the prompt you want to use for the task at hand.
 
 ```bash
+# readme-gen
 llm --system "Based on the codebase in this file, please generate a detailed README.md that includes an overview of the project, its main features, setup instructions, and usage examples." --save readme-gen
 ```
 
 ```bash
+# code-review-gen
 llm --system "You are a senior developer. Your job is to do a thorough code review of this code. You should write it up and output markdown. Include line numbers, and contextual info. Your code review will be passed to another teammate, so be thorough. Think deeply  before writing the code review. Review every part, and don't hallucinate." --save code-review-gen
 ```
 
 ```bash
+# test-coverage-gen
 llm --system "You are a senior developer. Your job is to review this code, and write out a list of missing test cases, and code tests that should exist. You should be specific, and be very good. Do Not Hallucinate. Think quietly to yourself, then act - write the issues. The issues  will be given to a developer to executed on, so they should be in a format that is compatible with github issues" --save test-coverage-gen
+```
+
+```bash
+# check_bad_actors_in_code
+llm --system "You are a multilingual programming assistant and translation specialist. Your task is to analyze a provided codebase, identify all comments, docstrings, variable names, and strings written in a language other than English, and translate them into English. The input will be a well-formatted text file containing code, comments, and docstrings. If the original language is unclear, infer the meaning as accurately as possible. Output the translated content, along with the original content for reference, in clean Markdown format.  " --save translate_to_english
+```
+
+```bash
+# check_bad_actors_in_code
+llm --system "You are a cybersecurity expert and code analysis specialist. Your task is to analyze a given codebase to identify malicious or suspicious code patterns, such as hardcoded credentials, obfuscated code, functions with potentially harmful behavior, unauthorized data access, or any other security vulnerabilities. The input will be provided as a well-formatted text file, containing headers and all the code in one place. Your output must include a list of findings in clear and organized Markdown format, with explanations for why the code is flagged as malicious or suspect.  ### Instructions:
+
+
+1. Carefully review the provided codebase.
+
+2. Identify and flag any sections of code that appear malicious, suspicious, or vulnerable.
+
+3. For each flagged section, include:
+
+    - A brief description of the issue.
+
+    - The reason why it is flagged as malicious or suspicious.
+
+    - The specific code snippet or line number (if available).
+
+4. Present the findings in clean Markdown format, including headers, lists, and code blocks for clarity." --save check_bad_actors_in_code
 ```
 
 
